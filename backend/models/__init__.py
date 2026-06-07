@@ -10,11 +10,28 @@ class Customer(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     phone = Column(String(20), nullable=False, unique=True)
-    car_model = Column(String(100), nullable=False)
-    car_plate = Column(String(20), nullable=False, unique=True)
     created_at = Column(DateTime, default=datetime.now)
 
     appointments = relationship("Appointment", back_populates="customer")
+    vehicles = relationship("Vehicle", back_populates="customer", cascade="all, delete-orphan")
+
+
+class Vehicle(Base):
+    __tablename__ = "vehicles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
+    car_model = Column(String(100), nullable=False)
+    car_plate = Column(String(20), nullable=False, unique=True)
+    vin = Column(String(50))
+    mileage = Column(Integer, default=0)
+    color = Column(String(30))
+    purchase_date = Column(DateTime)
+    remarks = Column(Text)
+    created_at = Column(DateTime, default=datetime.now)
+
+    customer = relationship("Customer", back_populates="vehicles")
+    appointments = relationship("Appointment", back_populates="vehicle")
 
 
 class Technician(Base):
@@ -53,6 +70,7 @@ class Appointment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
+    vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=True)
     service_type = Column(String(50), nullable=False)
     description = Column(Text)
     appointment_date = Column(DateTime, nullable=False)
@@ -60,6 +78,7 @@ class Appointment(Base):
     created_at = Column(DateTime, default=datetime.now)
 
     customer = relationship("Customer", back_populates="appointments")
+    vehicle = relationship("Vehicle", back_populates="appointments")
     work_order = relationship("WorkOrder", back_populates="appointment", uselist=False)
 
 

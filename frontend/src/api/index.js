@@ -59,3 +59,20 @@ export const workOrderAPI = {
   getDashboardStats: () => request.get('/work-orders/statistics/dashboard'),
   getInvoice: (id) => request.get(`/work-orders/${id}/invoice`)
 }
+
+export const vehicleAPI = {
+  getList: (params) => request.get('/vehicles', { params }),
+  getById: (id) => request.get(`/vehicles/${id}`),
+  create: (data) => request.post('/vehicles', data),
+  update: (id, data) => request.put(`/vehicles/${id}`, data),
+  delete: (id) => request.delete(`/vehicles/${id}`),
+  getMaintenanceTimeline: (id, params) => request.get(`/vehicles/${id}/maintenance-timeline`, { params }),
+  getServiceTypes: (id) => request.get(`/vehicles/${id}/service-types`)
+}
+
+export const customerAPI = {
+  getList: (params) => request.get('/customers', { params }),
+  getDetail: (id, params) => request.get(`/customers/${id}`, { params }),
+  create: (data) => request.post('/customers', data),
+  getServiceTypes: (id) => request.get(`/customers/${id}/service-types`)
+}

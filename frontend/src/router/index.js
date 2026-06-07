@@ -35,6 +35,26 @@ const routes = [
     path: '/parts',
     name: 'Parts',
     component: () => import('../views/Parts.vue')
+  },
+  {
+    path: '/customers',
+    name: 'Customers',
+    component: () => import('../views/Customers.vue')
+  },
+  {
+    path: '/customers/:id',
+    name: 'CustomerDetail',
+    component: () => import('../views/CustomerDetail.vue')
+  },
+  {
+    path: '/vehicles',
+    name: 'Vehicles',
+    component: () => import('../views/Vehicles.vue')
+  },
+  {
+    path: '/vehicles/:id/maintenance',
+    name: 'VehicleMaintenance',
+    component: () => import('../views/VehicleMaintenance.vue')
   }
 ]
 

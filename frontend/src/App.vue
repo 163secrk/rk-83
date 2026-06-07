@@ -34,6 +34,14 @@
             <el-icon><Tickets /></el-icon>
             <span>工单管理</span>
           </el-menu-item>
+          <el-menu-item index="/customers">
+            <el-icon><UserFilled /></el-icon>
+            <span>客户管理</span>
+          </el-menu-item>
+          <el-menu-item index="/vehicles">
+            <el-icon><Van /></el-icon>
+            <span>车辆管理</span>
+          </el-menu-item>
           <el-menu-item index="/technicians">
             <el-icon><User /></el-icon>
             <span>技师管理</span>

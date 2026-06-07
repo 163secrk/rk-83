@@ -104,6 +104,8 @@ def create_appointment(appointment: AppointmentCreate, db: Session = Depends(get
         "received_iso": appointment.appointment_date.isoformat() if hasattr(appointment.appointment_date, 'isoformat') else None
     })
     # #endregion
+    from models import Vehicle
+    
     customer = db.query(Customer).filter(Customer.phone == appointment.customer.phone).first() if appointment.customer else None
     
     if not customer and appointment.customer:
@@ -116,9 +118,23 @@ def create_appointment(appointment: AppointmentCreate, db: Session = Depends(get
         if not customer:
             raise HTTPException(status_code=404, detail="客户不存在")
     
+    vehicle_id = appointment.vehicle_id
+    if not vehicle_id and appointment.vehicle:
+        appointment.vehicle.customer_id = customer.id
+        existing_vehicle = db.query(Vehicle).filter(Vehicle.car_plate == appointment.vehicle.car_plate).first()
+        if existing_vehicle:
+            vehicle_id = existing_vehicle.id
+        else:
+            db_vehicle = Vehicle(**appointment.vehicle.model_dump())
+            db.add(db_vehicle)
+            db.commit()
+            db.refresh(db_vehicle)
+            vehicle_id = db_vehicle.id
+    
     local_appointment_date = _to_local_datetime(appointment.appointment_date)
     db_appointment = Appointment(
         customer_id=customer.id,
+        vehicle_id=vehicle_id,
         service_type=appointment.service_type,
         description=appointment.description,
         appointment_date=local_appointment_date,

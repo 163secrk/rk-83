@@ -6,8 +6,6 @@ from typing import Optional, List
 class CustomerBase(BaseModel):
     name: str
     phone: str
-    car_model: str
-    car_plate: str
 
 
 class CustomerCreate(CustomerBase):
@@ -17,6 +15,57 @@ class CustomerCreate(CustomerBase):
 class Customer(CustomerBase):
     id: int
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class VehicleBase(BaseModel):
+    customer_id: int
+    car_model: str
+    car_plate: str
+    vin: Optional[str] = None
+    mileage: Optional[int] = 0
+    color: Optional[str] = None
+    purchase_date: Optional[datetime] = None
+    remarks: Optional[str] = None
+
+
+class VehicleCreate(VehicleBase):
+    pass
+
+
+class VehicleUpdate(BaseModel):
+    car_model: Optional[str] = None
+    car_plate: Optional[str] = None
+    vin: Optional[str] = None
+    mileage: Optional[int] = None
+    color: Optional[str] = None
+    purchase_date: Optional[datetime] = None
+    remarks: Optional[str] = None
+
+
+class Vehicle(VehicleBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class VehicleWithCustomer(VehicleBase):
+    id: int
+    created_at: datetime
+    customer: Optional[Customer] = None
+
+    class Config:
+        from_attributes = True
+
+
+class CustomerWithVehicles(CustomerBase):
+    id: int
+    created_at: datetime
+    vehicles: List[Vehicle] = []
 
     class Config:
         from_attributes = True
@@ -79,6 +128,7 @@ class Part(PartBase):
 
 class AppointmentBase(BaseModel):
     customer_id: int
+    vehicle_id: Optional[int] = None
     service_type: str
     description: Optional[str] = None
     appointment_date: datetime
@@ -86,6 +136,7 @@ class AppointmentBase(BaseModel):
 
 class AppointmentCreate(AppointmentBase):
     customer: Optional[CustomerCreate] = None
+    vehicle: Optional[VehicleCreate] = None
 
 
 class AppointmentUpdate(BaseModel):
@@ -93,6 +144,7 @@ class AppointmentUpdate(BaseModel):
     service_type: Optional[str] = None
     description: Optional[str] = None
     appointment_date: Optional[datetime] = None
+    vehicle_id: Optional[int] = None
 
 
 class Appointment(AppointmentBase):
@@ -100,6 +152,68 @@ class Appointment(AppointmentBase):
     status: str
     created_at: datetime
     customer: Customer
+    vehicle: Optional[Vehicle] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MaintenanceRecordPart(BaseModel):
+    part_id: int
+    part_name: str
+    part_code: str
+    quantity: int
+    unit_price: float
+    subtotal: float
+
+    class Config:
+        from_attributes = True
+
+
+class MaintenanceRecord(BaseModel):
+    id: int
+    type: str
+    service_type: str
+    description: Optional[str] = None
+    date: datetime
+    status: str
+    technician_name: Optional[str] = None
+    labor_cost: float = 0
+    parts_total: float = 0
+    total_amount: float = 0
+    mileage: Optional[int] = None
+    notes: Optional[str] = None
+    parts: List[MaintenanceRecordPart] = []
+    appointment_id: Optional[int] = None
+    work_order_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class VehicleMaintenanceTimeline(BaseModel):
+    vehicle_id: int
+    car_model: str
+    car_plate: str
+    vin: Optional[str] = None
+    total_maintenance_count: int
+    total_cost: float
+    first_maintenance_date: Optional[datetime] = None
+    last_maintenance_date: Optional[datetime] = None
+    records: List[MaintenanceRecord] = []
+
+    class Config:
+        from_attributes = True
+
+
+class CustomerDetail(BaseModel):
+    id: int
+    name: str
+    phone: str
+    created_at: datetime
+    vehicles: List[VehicleMaintenanceTimeline] = []
+    total_maintenance_count: int = 0
+    total_cost: float = 0
 
     class Config:
         from_attributes = True

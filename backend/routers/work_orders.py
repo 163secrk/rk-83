@@ -426,12 +426,18 @@ def get_invoice(work_order_id: int, db: Session = Depends(get_db)):
     
     parts_total = sum(p.subtotal for p in db_work_order.parts)
     
+    car_model = None
+    car_plate = None
+    if db_work_order.appointment and db_work_order.appointment.vehicle:
+        car_model = db_work_order.appointment.vehicle.car_model
+        car_plate = db_work_order.appointment.vehicle.car_plate
+    
     return {
         "work_order_id": db_work_order.id,
         "customer_name": db_work_order.appointment.customer.name,
         "customer_phone": db_work_order.appointment.customer.phone,
-        "car_model": db_work_order.appointment.customer.car_model,
-        "car_plate": db_work_order.appointment.customer.car_plate,
+        "car_model": car_model,
+        "car_plate": car_plate,
         "service_type": db_work_order.appointment.service_type,
         "technician_name": db_work_order.technician.name,
         "labor_cost": db_work_order.labor_cost,
