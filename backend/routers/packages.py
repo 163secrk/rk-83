@@ -52,6 +52,9 @@ def create_package(package: MaintenancePackageCreate, db: Session = Depends(get_
     if existing:
         raise HTTPException(status_code=400, detail="套餐名称已存在")
     
+    if package.package_price <= 0:
+        raise HTTPException(status_code=400, detail="套餐价格必须大于0")
+    
     db_package = MaintenancePackage(
         name=package.name,
         description=package.description,
@@ -96,6 +99,9 @@ def update_package(
         ).first()
         if existing:
             raise HTTPException(status_code=400, detail="套餐名称已存在")
+    
+    if package_update.package_price is not None and package_update.package_price <= 0:
+        raise HTTPException(status_code=400, detail="套餐价格必须大于0")
     
     update_data = package_update.model_dump(exclude_unset=True, exclude={"services", "parts"})
     for key, value in update_data.items():

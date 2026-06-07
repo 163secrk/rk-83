@@ -133,7 +133,7 @@
         <el-form-item label="套餐价" prop="package_price">
           <el-input-number
             v-model="form.package_price"
-            :min="0"
+            :min="0.01"
             :precision="2"
             style="width: 100%"
           />
@@ -278,9 +278,19 @@ const form = reactive({
   parts: []
 })
 
+const validatePackagePrice = (rule, value, callback) => {
+  if (value === null || value === undefined || value === '') {
+    callback(new Error('请输入套餐价'))
+  } else if (value <= 0) {
+    callback(new Error('套餐价必须大于0'))
+  } else {
+    callback()
+  }
+}
+
 const rules = {
   name: [{ required: true, message: '请输入套餐名称', trigger: 'blur' }],
-  package_price: [{ required: true, message: '请输入套餐价', trigger: 'blur' }]
+  package_price: [{ required: true, validator: validatePackagePrice, trigger: 'blur' }]
 }
 
 const dialogTitle = computed(() => {

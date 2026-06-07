@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 from typing import Optional, List
 
@@ -197,8 +197,14 @@ class MaintenancePackagePart(MaintenancePackagePartBase):
 class MaintenancePackageBase(BaseModel):
     name: str
     description: Optional[str] = None
-    package_price: float
+    package_price: float = Field(..., gt=0, description="套餐价格必须大于0")
     is_active: Optional[int] = 1
+
+    @field_validator('package_price')
+    def check_package_price(cls, v):
+        if v <= 0:
+            raise ValueError('套餐价格必须大于0')
+        return v
 
 
 class MaintenancePackageCreate(MaintenancePackageBase):
@@ -209,10 +215,16 @@ class MaintenancePackageCreate(MaintenancePackageBase):
 class MaintenancePackageUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    package_price: Optional[float] = None
+    package_price: Optional[float] = Field(None, gt=0, description="套餐价格必须大于0")
     is_active: Optional[int] = None
     services: Optional[List[MaintenancePackageServiceCreate]] = None
     parts: Optional[List[MaintenancePackagePartCreate]] = None
+
+    @field_validator('package_price')
+    def check_package_price(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError('套餐价格必须大于0')
+        return v
 
 
 class MaintenancePackage(MaintenancePackageBase):

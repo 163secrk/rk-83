@@ -26,15 +26,19 @@ def get_technician_month_stats(technician_id: int, db: Session) -> TechnicianMon
         WorkOrder.actual_end >= month_start
     ).scalar() or 0
     
-    total_hours = db.query(func.sum(
-        func.extract('epoch', WorkOrder.actual_end - WorkOrder.actual_start) / 3600
-    )).filter(
+    work_orders = db.query(WorkOrder).filter(
         WorkOrder.technician_id == technician_id,
         WorkOrder.status == "completed",
         WorkOrder.actual_end >= month_start,
         WorkOrder.actual_start.isnot(None),
         WorkOrder.actual_end.isnot(None)
-    ).scalar() or 0
+    ).all()
+    
+    total_hours = 0.0
+    for wo in work_orders:
+        if wo.actual_end and wo.actual_start and wo.actual_end >= wo.actual_start:
+            duration = (wo.actual_end - wo.actual_start).total_seconds() / 3600
+            total_hours += max(duration, 0)
     
     total_income = db.query(func.sum(WorkOrder.total_amount)).filter(
         WorkOrder.technician_id == technician_id,
@@ -44,7 +48,7 @@ def get_technician_month_stats(technician_id: int, db: Session) -> TechnicianMon
     
     return TechnicianMonthStats(
         completed_orders=completed_orders,
-        total_hours=round(float(total_hours), 2),
+        total_hours=round(total_hours, 2),
         total_income=round(float(total_income), 2)
     )
 
