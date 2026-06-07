@@ -67,6 +67,8 @@
                 placeholder="选择预约时间"
                 :disabled-date="disabledDate"
                 :shortcuts="shortcuts"
+                format="YYYY-MM-DD HH:mm"
+                value-format="YYYY-MM-DD HH:mm:ss"
                 style="width: 100%"
               />
             </el-form-item>
@@ -216,7 +218,13 @@ const submitForm = async () => {
     if (valid) {
       submitting.value = true
       try {
+        // #region debug-point H1:appointment-time-before-submit
+        fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"maintenance-system-bugs",runId:"pre-fix",hypothesisId:"H1",location:"AppointmentForm.vue:212",msg:"[DEBUG] 预约提交前时间值",data:{appointment_date_form:form.appointment_date,appointment_date_iso:form.appointment_date?.toISOString(),appointment_date_local:form.appointment_date?.toString(),timezone_offset:new Date().getTimezoneOffset()},ts:Date.now()})}).catch(()=>{});
+        // #endregion
         const result = await appointmentAPI.create(form)
+        // #region debug-point H1:appointment-time-after-response
+        fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"maintenance-system-bugs",runId:"pre-fix",hypothesisId:"H1",location:"AppointmentForm.vue:221",msg:"[DEBUG] 预约返回后时间值",data:{returned_appointment_date:result.appointment_date,returned_date_formatted:formatDate(result.appointment_date)},ts:Date.now()})}).catch(()=>{});
+        // #endregion
         successAppointment.value = result
         ElMessage.success('预约提交成功！')
       } catch (error) {

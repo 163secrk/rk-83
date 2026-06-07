@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, update
 from typing import List
 from datetime import datetime, date
 from database import get_db
@@ -15,6 +15,59 @@ from schemas import (
 )
 
 router = APIRouter()
+
+
+def _deduct_stock_atomic(db: Session, part_id: int, quantity: int) -> Part:
+    stmt = (
+        update(Part)
+        .where(Part.id == part_id, Part.stock >= quantity)
+        .values(stock=Part.stock - quantity)
+        .execution_options(synchronize_session="fetch")
+    )
+    result = db.execute(stmt)
+    if result.rowcount == 0:
+        part = db.query(Part).filter(Part.id == part_id).first()
+        part_name = part.name if part else f"ID {part_id}"
+        raise HTTPException(status_code=400, detail=f"配件 {part_name} 库存不足")
+    return db.query(Part).filter(Part.id == part_id).first()
+
+
+def _add_stock_atomic(db: Session, part_id: int, quantity: int) -> Part:
+    stmt = (
+        update(Part)
+        .where(Part.id == part_id)
+        .values(stock=Part.stock + quantity)
+        .execution_options(synchronize_session="fetch")
+    )
+    db.execute(stmt)
+    return db.query(Part).filter(Part.id == part_id).first()
+
+
+# #region debug-point helper
+import json, urllib.request, threading
+DEBUG_SERVER_URL = "http://127.0.0.1:7777/event"
+DEBUG_SESSION_ID = "maintenance-system-bugs"
+def _send_debug_log(hypothesis_id, location, msg, data):
+    def _send():
+        try:
+            payload = {
+                "sessionId": DEBUG_SESSION_ID,
+                "runId": "pre-fix",
+                "hypothesisId": hypothesis_id,
+                "location": location,
+                "msg": "[DEBUG] " + msg,
+                "data": data
+            }
+            req = urllib.request.Request(
+                DEBUG_SERVER_URL,
+                data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json"}
+            )
+            urllib.request.urlopen(req, timeout=2).read()
+        except:
+            pass
+    threading.Thread(target=_send).start()
+# #endregion
 
 
 @router.get("/", response_model=List[WorkOrderSchema])
@@ -32,9 +85,11 @@ def get_work_orders(
     if technician_id:
         query = query.filter(WorkOrder.technician_id == technician_id)
     if start_date:
-        query = query.filter(WorkOrder.created_at >= start_date)
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        query = query.filter(WorkOrder.created_at >= start_datetime)
     if end_date:
-        query = query.filter(WorkOrder.created_at <= end_date)
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        query = query.filter(WorkOrder.created_at <= end_datetime)
     
     return query.all()
 
@@ -101,18 +156,19 @@ def update_work_order(
                 raise HTTPException(status_code=404, detail=f"配件ID {part_item.part_id} 不存在")
             
             unit_price = getattr(part_item, 'unit_price', None) or part.price
-            
-            if part.stock < part_item.quantity:
-                raise HTTPException(status_code=400, detail=f"配件 {part.name} 库存不足")
-            
             existing_part = existing_parts.get(part_item.part_id)
             
             if existing_part:
-                part.stock += existing_part.quantity
+                quantity_diff = part_item.quantity - existing_part.quantity
+                if quantity_diff > 0:
+                    _deduct_stock_atomic(db, part_item.part_id, quantity_diff)
+                elif quantity_diff < 0:
+                    _add_stock_atomic(db, part_item.part_id, -quantity_diff)
                 existing_part.quantity = part_item.quantity
                 existing_part.unit_price = unit_price
                 existing_part.subtotal = unit_price * part_item.quantity
             else:
+                _deduct_stock_atomic(db, part_item.part_id, part_item.quantity)
                 work_order_part = WorkOrderPart(
                     work_order_id=work_order_id,
                     part_id=part_item.part_id,
@@ -121,8 +177,6 @@ def update_work_order(
                     subtotal=unit_price * part_item.quantity
                 )
                 db.add(work_order_part)
-            
-            part.stock -= part_item.quantity
     
     db.commit()
     db.refresh(db_work_order)
@@ -174,9 +228,6 @@ def add_work_order_part(
     if not part:
         raise HTTPException(status_code=404, detail="配件不存在")
     
-    if part.stock < part_data.quantity:
-        raise HTTPException(status_code=400, detail="库存不足")
-    
     unit_price = part_data.unit_price if part_data.unit_price is not None else part.price
     
     existing_part = db.query(WorkOrderPart).filter(
@@ -185,11 +236,12 @@ def add_work_order_part(
     ).first()
     
     if existing_part:
-        part.stock += existing_part.quantity
+        _deduct_stock_atomic(db, part_data.part_id, part_data.quantity)
         existing_part.quantity += part_data.quantity
         existing_part.unit_price = unit_price
         existing_part.subtotal = existing_part.quantity * unit_price
     else:
+        _deduct_stock_atomic(db, part_data.part_id, part_data.quantity)
         work_order_part = WorkOrderPart(
             work_order_id=work_order_id,
             part_id=part_data.part_id,
@@ -198,8 +250,6 @@ def add_work_order_part(
             subtotal=unit_price * part_data.quantity
         )
         db.add(work_order_part)
-    
-    part.stock -= part_data.quantity
     
     db.commit()
     db.refresh(db_work_order)
@@ -237,9 +287,10 @@ def update_work_order_part(
     
     if part_data.quantity is not None:
         quantity_diff = part_data.quantity - work_order_part.quantity
-        if quantity_diff > 0 and part.stock < quantity_diff:
-            raise HTTPException(status_code=400, detail="库存不足")
-        part.stock -= quantity_diff
+        if quantity_diff > 0:
+            _deduct_stock_atomic(db, part_id, quantity_diff)
+        elif quantity_diff < 0:
+            _add_stock_atomic(db, part_id, -quantity_diff)
         work_order_part.quantity = part_data.quantity
     
     if part_data.unit_price is not None:
@@ -278,8 +329,7 @@ def remove_work_order_part(
     if not work_order_part:
         raise HTTPException(status_code=404, detail="该工单中无此配件")
     
-    part = db.query(Part).filter(Part.id == part_id).first()
-    part.stock += work_order_part.quantity
+    _add_stock_atomic(db, part_id, work_order_part.quantity)
     
     db.delete(work_order_part)
     db.commit()
@@ -302,8 +352,7 @@ def delete_work_order(work_order_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="进行中或已完成的工单无法删除")
     
     for work_order_part in db_work_order.parts:
-        part = db.query(Part).filter(Part.id == work_order_part.part_id).first()
-        part.stock += work_order_part.quantity
+        _add_stock_atomic(db, work_order_part.part_id, work_order_part.quantity)
         db.delete(work_order_part)
     
     if db_work_order.appointment:

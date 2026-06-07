@@ -164,7 +164,13 @@ const loadData = async () => {
       params.start_date = filters.dateRange[0]
       params.end_date = filters.dateRange[1]
     }
+    // #region debug-point H3,H4:date-filter-params
+    fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"maintenance-system-bugs",runId:"pre-fix",hypothesisId:"H3,H4",location:"Appointments.vue:158",msg:"[DEBUG] 日期筛选参数",data:{filters_dateRange:filters.dateRange,params_start_date:params.start_date,params_end_date:params.end_date,local_today:new Date().toLocaleDateString(),local_timezone_offset:new Date().getTimezoneOffset()},ts:Date.now()})}).catch(()=>{});
+    // #endregion
     appointments.value = await appointmentAPI.getList(params)
+    // #region debug-point H3,H4:date-filter-results
+    fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"maintenance-system-bugs",runId:"pre-fix",hypothesisId:"H3,H4",location:"Appointments.vue:167",msg:"[DEBUG] 日期筛选结果",data:{result_count:appointments.value.length,results:appointments.value.map(a=>({id:a.id,appointment_date:a.appointment_date,formatted:formatDate(a.appointment_date)}))},ts:Date.now()})}).catch(()=>{});
+    // #endregion
   } catch (error) {
     ElMessage.error('加载数据失败')
   } finally {

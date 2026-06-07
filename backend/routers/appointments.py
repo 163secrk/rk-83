@@ -1,13 +1,47 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
 from database import get_db
 from models import Appointment, Customer, WorkOrder
 from schemas import Appointment as AppointmentSchema, AppointmentCreate, AppointmentUpdate, CustomerCreate
 
 router = APIRouter()
 
+TZ_OFFSET = timedelta(hours=8)
+
+
+def _to_local_datetime(dt: datetime) -> datetime:
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone(TZ_OFFSET)).replace(tzinfo=None)
+    return dt
+
+
+# #region debug-point helper
+import json, urllib.request, threading
+DEBUG_SERVER_URL = "http://127.0.0.1:7777/event"
+DEBUG_SESSION_ID = "maintenance-system-bugs"
+def _send_debug_log(hypothesis_id, location, msg, data):
+    def _send():
+        try:
+            payload = {
+                "sessionId": DEBUG_SESSION_ID,
+                "runId": "pre-fix",
+                "hypothesisId": hypothesis_id,
+                "location": location,
+                "msg": "[DEBUG] " + msg,
+                "data": data
+            }
+            req = urllib.request.Request(
+                DEBUG_SERVER_URL,
+                data=json.dumps(payload).encode(),
+                headers={"Content-Type": "application/json"}
+            )
+            urllib.request.urlopen(req, timeout=2).read()
+        except:
+            pass
+    threading.Thread(target=_send).start()
+# #endregion
 
 @router.get("/", response_model=List[AppointmentSchema])
 def get_appointments(
@@ -16,16 +50,41 @@ def get_appointments(
     end_date: date = None,
     db: Session = Depends(get_db)
 ):
+    # #region debug-point H3,H4:date-filter-received
+    _send_debug_log("H3,H4", "appointments.py:12", "后端收到的日期筛选参数", {
+        "start_date": str(start_date),
+        "start_date_type": str(type(start_date)),
+        "end_date": str(end_date),
+        "end_date_type": str(type(end_date)),
+        "server_today": str(date.today()),
+        "server_now": str(datetime.now())
+    })
+    # #endregion
     query = db.query(Appointment).order_by(Appointment.appointment_date.desc())
     
     if status:
         query = query.filter(Appointment.status == status)
     if start_date:
-        query = query.filter(Appointment.appointment_date >= start_date)
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        query = query.filter(Appointment.appointment_date >= start_datetime)
     if end_date:
-        query = query.filter(Appointment.appointment_date <= end_date)
+        end_datetime = datetime.combine(end_date, datetime.max.time())
+        query = query.filter(Appointment.appointment_date <= end_datetime)
     
-    return query.all()
+    result = query.all()
+    # #region debug-point H3,H4:date-filter-query-result
+    _send_debug_log("H3,H4", "appointments.py:28", "日期筛选查询结果", {
+        "result_count": len(result),
+        "results": [
+            {
+                "id": a.id,
+                "appointment_date": str(a.appointment_date),
+                "appointment_date_iso": a.appointment_date.isoformat() if hasattr(a.appointment_date, 'isoformat') else None
+            } for a in result
+        ]
+    })
+    # #endregion
+    return result
 
 
 @router.get("/{appointment_id}", response_model=AppointmentSchema)
@@ -38,6 +97,13 @@ def get_appointment(appointment_id: int, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=AppointmentSchema)
 def create_appointment(appointment: AppointmentCreate, db: Session = Depends(get_db)):
+    # #region debug-point H1:appointment-time-received
+    _send_debug_log("H1", "appointments.py:40", "后端收到的预约时间", {
+        "received_appointment_date": str(appointment.appointment_date),
+        "received_type": str(type(appointment.appointment_date)),
+        "received_iso": appointment.appointment_date.isoformat() if hasattr(appointment.appointment_date, 'isoformat') else None
+    })
+    # #endregion
     customer = db.query(Customer).filter(Customer.phone == appointment.customer.phone).first() if appointment.customer else None
     
     if not customer and appointment.customer:
@@ -50,16 +116,24 @@ def create_appointment(appointment: AppointmentCreate, db: Session = Depends(get
         if not customer:
             raise HTTPException(status_code=404, detail="客户不存在")
     
+    local_appointment_date = _to_local_datetime(appointment.appointment_date)
     db_appointment = Appointment(
         customer_id=customer.id,
         service_type=appointment.service_type,
         description=appointment.description,
-        appointment_date=appointment.appointment_date,
+        appointment_date=local_appointment_date,
         status="pending"
     )
     db.add(db_appointment)
     db.commit()
     db.refresh(db_appointment)
+    # #region debug-point H1:appointment-time-saved
+    _send_debug_log("H1", "appointments.py:62", "数据库保存的预约时间", {
+        "saved_appointment_date": str(db_appointment.appointment_date),
+        "saved_type": str(type(db_appointment.appointment_date)),
+        "saved_iso": db_appointment.appointment_date.isoformat() if hasattr(db_appointment.appointment_date, 'isoformat') else None
+    })
+    # #endregion
     return db_appointment
 
 
