@@ -44,6 +44,7 @@ class Technician(TechnicianBase):
 class PartBase(BaseModel):
     name: str
     code: str
+    specification: Optional[str] = None
     category: str
     price: float
     stock: Optional[int] = 0
@@ -59,6 +60,7 @@ class PartCreate(PartBase):
 class PartUpdate(BaseModel):
     name: Optional[str] = None
     code: Optional[str] = None
+    specification: Optional[str] = None
     category: Optional[str] = None
     price: Optional[float] = None
     stock: Optional[int] = None
@@ -109,7 +111,12 @@ class WorkOrderPartBase(BaseModel):
 
 
 class WorkOrderPartCreate(WorkOrderPartBase):
-    pass
+    unit_price: Optional[float] = None
+
+
+class WorkOrderPartUpdate(BaseModel):
+    quantity: Optional[int] = None
+    unit_price: Optional[float] = None
 
 
 class WorkOrderPart(WorkOrderPartBase):
@@ -165,3 +172,4 @@ class DashboardStats(BaseModel):
     total_parts: int
     low_stock_parts: int
     total_revenue: float
+    low_stock_parts_list: List[Part] = []

@@ -20,18 +20,18 @@ def init_data():
         
         if db.query(Part).count() == 0:
             parts = [
-                Part(name="机油", code="OIL001", category="油品", price=198.0, stock=50, min_stock=20, unit="升", description="全合成5W-30机油"),
-                Part(name="机油滤清器", code="FIL001", category="滤清器", price=35.0, stock=100, min_stock=30, unit="个", description="机油格"),
-                Part(name="空气滤清器", code="FIL002", category="滤清器", price=45.0, stock=80, min_stock=20, unit="个", description="空气格"),
-                Part(name="空调滤清器", code="FIL003", category="滤清器", price=55.0, stock=60, min_stock=20, unit="个", description="空调格"),
-                Part(name="火花塞", code="SPA001", category="点火系统", price=85.0, stock=40, min_stock=15, unit="个", description="铂金火花塞"),
-                Part(name="刹车片", code="BRA001", category="制动系统", price=280.0, stock=30, min_stock=10, unit="套", description="前刹车片"),
-                Part(name="刹车油", code="BRA002", category="油品", price=120.0, stock=25, min_stock=10, unit="升", description="DOT4刹车油"),
-                Part(name="防冻液", code="COO001", category="油品", price=95.0, stock=40, min_stock=15, unit="升", description="-35℃防冻液"),
-                Part(name="变速箱油", code="TRA001", category="油品", price=180.0, stock=20, min_stock=8, unit="升", description="自动变速箱油"),
-                Part(name="轮胎", code="TYR001", category="轮胎", price=650.0, stock=16, min_stock=4, unit="条", description="195/65 R15"),
-                Part(name="雨刮片", code="WIP001", category="外观", price=65.0, stock=50, min_stock=20, unit="对", description="无骨雨刮"),
-                Part(name="蓄电池", code="BAT001", category="电气", price=480.0, stock=10, min_stock=3, unit="个", description="12V 60Ah蓄电池")
+                Part(name="机油", code="OIL001", specification="5W-30 全合成", category="油品", price=198.0, stock=50, min_stock=20, unit="升", description="全合成5W-30机油"),
+                Part(name="机油滤清器", code="FIL001", specification="适配大众EA211", category="滤清器", price=35.0, stock=100, min_stock=30, unit="个", description="机油格"),
+                Part(name="空气滤清器", code="FIL002", specification="适配丰田卡罗拉", category="滤清器", price=45.0, stock=80, min_stock=20, unit="个", description="空气格"),
+                Part(name="空调滤清器", code="FIL003", specification="活性炭 PM2.5", category="滤清器", price=55.0, stock=60, min_stock=20, unit="个", description="空调格"),
+                Part(name="火花塞", code="SPA001", specification="双铂金 1.4T", category="点火系统", price=85.0, stock=40, min_stock=15, unit="个", description="铂金火花塞"),
+                Part(name="刹车片", code="BRA001", specification="前刹车片 陶瓷配方", category="制动系统", price=280.0, stock=30, min_stock=10, unit="套", description="前刹车片"),
+                Part(name="刹车油", code="BRA002", specification="DOT4 1L装", category="油品", price=120.0, stock=25, min_stock=10, unit="升", description="DOT4刹车油"),
+                Part(name="防冻液", code="COO001", specification="-35℃ 红色", category="油品", price=95.0, stock=40, min_stock=15, unit="升", description="-35℃防冻液"),
+                Part(name="变速箱油", code="TRA001", specification="ATF 6速自动", category="油品", price=180.0, stock=20, min_stock=8, unit="升", description="自动变速箱油"),
+                Part(name="轮胎", code="TYR001", specification="195/65 R15 91V", category="轮胎", price=650.0, stock=16, min_stock=4, unit="条", description="195/65 R15"),
+                Part(name="雨刮片", code="WIP001", specification="24/16寸 无骨", category="外观", price=65.0, stock=50, min_stock=20, unit="对", description="无骨雨刮"),
+                Part(name="蓄电池", code="BAT001", specification="12V 60Ah 550CCA", category="电气", price=480.0, stock=10, min_stock=3, unit="个", description="12V 60Ah蓄电池")
             ]
             db.add_all(parts)
             print("已初始化配件数据")

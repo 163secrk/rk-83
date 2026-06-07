@@ -127,6 +127,7 @@
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="code" label="配件编码" width="120" />
         <el-table-column prop="name" label="配件名称" />
+        <el-table-column prop="specification" label="规格型号" min-width="150" show-overflow-tooltip />
         <el-table-column prop="category" label="分类" width="120" />
         <el-table-column prop="price" label="单价" width="120">
           <template #default="{ row }">
@@ -186,6 +187,9 @@
         </el-form-item>
         <el-form-item label="配件名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入配件名称" />
+        </el-form-item>
+        <el-form-item label="规格型号" prop="specification">
+          <el-input v-model="form.specification" placeholder="如：5W-30、195/65 R15" />
         </el-form-item>
         <el-form-item label="分类" prop="category">
           <el-select v-model="form.category" placeholder="请选择或输入分类" allow-create style="width: 100%">
@@ -277,6 +281,7 @@ const filters = reactive({
 const form = reactive({
   code: '',
   name: '',
+  specification: '',
   category: '',
   price: 0,
   stock: 0,
@@ -370,6 +375,7 @@ const submitForm = async () => {
         Object.assign(form, {
           code: '',
           name: '',
+          specification: '',
           category: '',
           price: 0,
           stock: 0,

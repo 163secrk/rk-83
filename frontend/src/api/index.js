@@ -53,6 +53,7 @@ export const workOrderAPI = {
   update: (id, data) => request.put(`/work-orders/${id}`, data),
   updateStatus: (id, status) => request.put(`/work-orders/${id}/status?status=${status}`),
   addPart: (id, data) => request.post(`/work-orders/${id}/parts`, data),
+  updatePart: (orderId, partId, data) => request.put(`/work-orders/${orderId}/parts/${partId}`, data),
   removePart: (orderId, partId) => request.delete(`/work-orders/${orderId}/parts/${partId}`),
   delete: (id) => request.delete(`/work-orders/${id}`),
   getDashboardStats: () => request.get('/work-orders/statistics/dashboard'),

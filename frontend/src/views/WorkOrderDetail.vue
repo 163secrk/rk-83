@@ -150,27 +150,66 @@
       <el-table :data="workOrder?.parts || []" v-loading="loading" border empty-text="暂无配件消耗记录">
         <el-table-column prop="part.code" label="配件编码" width="120" />
         <el-table-column prop="part.name" label="配件名称" />
+        <el-table-column prop="part.specification" label="规格型号" min-width="150" show-overflow-tooltip />
         <el-table-column prop="part.category" label="分类" width="120" />
         <el-table-column prop="quantity" label="数量" width="100">
           <template #default="{ row }">
-            {{ row.quantity }} {{ row.part.unit }}
+            <span v-if="!editingPart || editingPart.id !== row.id">
+              {{ row.quantity }} {{ row.part.unit }}
+            </span>
+            <el-input-number
+              v-else
+              v-model="editPartForm.quantity"
+              :min="1"
+              :max="(row.part.stock + row.quantity)"
+              size="small"
+              style="width: 100%"
+            />
           </template>
         </el-table-column>
-        <el-table-column prop="unit_price" label="单价" width="120">
+        <el-table-column prop="unit_price" label="单价" width="130">
           <template #default="{ row }">
-            ¥{{ row.unit_price.toFixed(2) }}
+            <span v-if="!editingPart || editingPart.id !== row.id">
+              ¥{{ row.unit_price.toFixed(2) }}
+            </span>
+            <el-input-number
+              v-else
+              v-model="editPartForm.unit_price"
+              :min="0"
+              :precision="2"
+              size="small"
+              style="width: 100%"
+            />
           </template>
         </el-table-column>
-        <el-table-column prop="subtotal" label="小计" width="120">
+        <el-table-column prop="subtotal" label="小计" width="130">
           <template #default="{ row }">
-            ¥{{ row.subtotal.toFixed(2) }}
+            <span v-if="!editingPart || editingPart.id !== row.id">
+              ¥{{ row.subtotal.toFixed(2) }}
+            </span>
+            <span v-else class="editing-subtotal">
+              ¥{{ (editPartForm.quantity * editPartForm.unit_price).toFixed(2) }}
+            </span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" v-if="workOrder?.status !== 'completed'">
+        <el-table-column label="操作" width="180" v-if="workOrder?.status !== 'completed'" fixed="right">
           <template #default="{ row }">
-            <el-button type="danger" size="small" @click="removePart(row)">
-              删除
-            </el-button>
+            <template v-if="!editingPart || editingPart.id !== row.id">
+              <el-button type="primary" size="small" @click="startEditPart(row)">
+                编辑
+              </el-button>
+              <el-button type="danger" size="small" @click="removePart(row)">
+                删除
+              </el-button>
+            </template>
+            <template v-else>
+              <el-button type="success" size="small" @click="saveEditPart(row)" :loading="submitting">
+                保存
+              </el-button>
+              <el-button type="info" size="small" @click="cancelEditPart">
+                取消
+              </el-button>
+            </template>
           </template>
         </el-table-column>
       </el-table>
@@ -188,7 +227,7 @@
             <el-option
               v-for="part in availableParts"
               :key="part.id"
-              :label="`${part.name} (库存: ${part.stock}${part.unit}) - ¥${part.price}`"
+              :label="`${part.name} ${part.specification ? '(' + part.specification + ')' : ''} (库存: ${part.stock}${part.unit}) - ¥${part.price}`"
               :value="part.id"
             />
           </el-select>
@@ -201,7 +240,19 @@
             style="width: 100%"
           />
           <div v-if="selectedPart" class="stock-info">
-            当前库存：{{ selectedPart.stock }} {{ selectedPart.unit }}，单价：¥{{ selectedPart.price }}
+            当前库存：{{ selectedPart.stock }} {{ selectedPart.unit }}，规格：{{ selectedPart.specification || '无' }}
+          </div>
+        </el-form-item>
+        <el-form-item label="单价(元)" prop="unit_price">
+          <el-input-number
+            v-model="addPartForm.unit_price"
+            :min="0"
+            :precision="2"
+            :placeholder="'默认: ¥' + (selectedPart?.price || 0)"
+            style="width: 100%"
+          />
+          <div class="stock-info">
+            留空则使用配件默认单价
           </div>
         </el-form-item>
       </el-form>
@@ -243,6 +294,7 @@
           <h4>费用明细</h4>
           <el-table :data="invoice.parts" border size="small">
             <el-table-column prop="name" label="配件名称" />
+            <el-table-column prop="specification" label="规格型号" min-width="120" show-overflow-tooltip />
             <el-table-column prop="code" label="编码" width="100" />
             <el-table-column label="数量" width="80">
               <template #default="{ row }">
@@ -301,7 +353,14 @@ const costForm = reactive({
 
 const addPartForm = reactive({
   part_id: null,
-  quantity: 1
+  quantity: 1,
+  unit_price: null
+})
+
+const editingPart = ref(null)
+const editPartForm = reactive({
+  quantity: 1,
+  unit_price: 0
 })
 
 const selectedPart = computed(() => {
@@ -440,14 +499,58 @@ const addPart = async () => {
   
   submitting.value = true
   try {
-    await workOrderAPI.addPart(workOrderId.value, addPartForm)
+    const payload = {
+      part_id: addPartForm.part_id,
+      quantity: addPartForm.quantity
+    }
+    if (addPartForm.unit_price !== null && addPartForm.unit_price !== undefined) {
+      payload.unit_price = addPartForm.unit_price
+    }
+    await workOrderAPI.addPart(workOrderId.value, payload)
     ElMessage.success('配件添加成功')
     showAddPartDialog.value = false
     addPartForm.part_id = null
     addPartForm.quantity = 1
+    addPartForm.unit_price = null
     loadWorkOrder()
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || '添加失败')
+  } finally {
+    submitting.value = false
+  }
+}
+
+const startEditPart = (row) => {
+  editingPart.value = row
+  editPartForm.quantity = row.quantity
+  editPartForm.unit_price = row.unit_price
+}
+
+const cancelEditPart = () => {
+  editingPart.value = null
+}
+
+const saveEditPart = async (row) => {
+  if (!editPartForm.quantity || editPartForm.quantity <= 0) {
+    ElMessage.warning('请输入有效数量')
+    return
+  }
+  if (editPartForm.unit_price === null || editPartForm.unit_price < 0) {
+    ElMessage.warning('请输入有效单价')
+    return
+  }
+  
+  submitting.value = true
+  try {
+    await workOrderAPI.updatePart(workOrderId.value, row.part_id, {
+      quantity: editPartForm.quantity,
+      unit_price: editPartForm.unit_price
+    })
+    ElMessage.success('配件更新成功')
+    editingPart.value = null
+    loadWorkOrder()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '更新失败')
   } finally {
     submitting.value = false
   }
@@ -579,6 +682,11 @@ onMounted(() => {
   font-size: 12px;
   color: #909399;
   margin-top: 4px;
+}
+
+.editing-subtotal {
+  color: #e6a23c;
+  font-weight: bold;
 }
 
 .invoice {

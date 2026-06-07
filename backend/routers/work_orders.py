@@ -10,6 +10,7 @@ from schemas import (
     WorkOrderCreate,
     WorkOrderUpdate,
     WorkOrderPartCreate,
+    WorkOrderPartUpdate,
     DashboardStats
 )
 
@@ -92,31 +93,32 @@ def update_work_order(
         setattr(db_work_order, key, value)
     
     if work_order_update.parts:
+        existing_parts = {wp.part_id: wp for wp in db_work_order.parts}
+        
         for part_item in work_order_update.parts:
             part = db.query(Part).filter(Part.id == part_item.part_id).first()
             if not part:
                 raise HTTPException(status_code=404, detail=f"配件ID {part_item.part_id} 不存在")
             
+            unit_price = getattr(part_item, 'unit_price', None) or part.price
+            
             if part.stock < part_item.quantity:
                 raise HTTPException(status_code=400, detail=f"配件 {part.name} 库存不足")
             
-            existing_part = db.query(WorkOrderPart).filter(
-                WorkOrderPart.work_order_id == work_order_id,
-                WorkOrderPart.part_id == part_item.part_id
-            ).first()
+            existing_part = existing_parts.get(part_item.part_id)
             
             if existing_part:
                 part.stock += existing_part.quantity
                 existing_part.quantity = part_item.quantity
-                existing_part.unit_price = part.price
-                existing_part.subtotal = part.price * part_item.quantity
+                existing_part.unit_price = unit_price
+                existing_part.subtotal = unit_price * part_item.quantity
             else:
                 work_order_part = WorkOrderPart(
                     work_order_id=work_order_id,
                     part_id=part_item.part_id,
                     quantity=part_item.quantity,
-                    unit_price=part.price,
-                    subtotal=part.price * part_item.quantity
+                    unit_price=unit_price,
+                    subtotal=unit_price * part_item.quantity
                 )
                 db.add(work_order_part)
             
@@ -175,6 +177,8 @@ def add_work_order_part(
     if part.stock < part_data.quantity:
         raise HTTPException(status_code=400, detail="库存不足")
     
+    unit_price = part_data.unit_price if part_data.unit_price is not None else part.price
+    
     existing_part = db.query(WorkOrderPart).filter(
         WorkOrderPart.work_order_id == work_order_id,
         WorkOrderPart.part_id == part_data.part_id
@@ -183,18 +187,65 @@ def add_work_order_part(
     if existing_part:
         part.stock += existing_part.quantity
         existing_part.quantity += part_data.quantity
-        existing_part.subtotal = existing_part.quantity * existing_part.unit_price
+        existing_part.unit_price = unit_price
+        existing_part.subtotal = existing_part.quantity * unit_price
     else:
         work_order_part = WorkOrderPart(
             work_order_id=work_order_id,
             part_id=part_data.part_id,
             quantity=part_data.quantity,
-            unit_price=part.price,
-            subtotal=part.price * part_data.quantity
+            unit_price=unit_price,
+            subtotal=unit_price * part_data.quantity
         )
         db.add(work_order_part)
     
     part.stock -= part_data.quantity
+    
+    db.commit()
+    db.refresh(db_work_order)
+    
+    parts_total = sum(p.subtotal for p in db_work_order.parts)
+    db_work_order.total_amount = db_work_order.labor_cost + parts_total
+    db.commit()
+    
+    return db_work_order
+
+
+@router.put("/{work_order_id}/parts/{part_id}")
+def update_work_order_part(
+    work_order_id: int,
+    part_id: int,
+    part_data: WorkOrderPartUpdate,
+    db: Session = Depends(get_db)
+):
+    db_work_order = db.query(WorkOrder).filter(WorkOrder.id == work_order_id).first()
+    if not db_work_order:
+        raise HTTPException(status_code=404, detail="工单不存在")
+    
+    if db_work_order.status == "completed":
+        raise HTTPException(status_code=400, detail="工单已完成，无法修改配件")
+    
+    work_order_part = db.query(WorkOrderPart).filter(
+        WorkOrderPart.work_order_id == work_order_id,
+        WorkOrderPart.part_id == part_id
+    ).first()
+    
+    if not work_order_part:
+        raise HTTPException(status_code=404, detail="该工单中无此配件")
+    
+    part = db.query(Part).filter(Part.id == part_id).first()
+    
+    if part_data.quantity is not None:
+        quantity_diff = part_data.quantity - work_order_part.quantity
+        if quantity_diff > 0 and part.stock < quantity_diff:
+            raise HTTPException(status_code=400, detail="库存不足")
+        part.stock -= quantity_diff
+        work_order_part.quantity = part_data.quantity
+    
+    if part_data.unit_price is not None:
+        work_order_part.unit_price = part_data.unit_price
+    
+    work_order_part.subtotal = work_order_part.quantity * work_order_part.unit_price
     
     db.commit()
     db.refresh(db_work_order)
@@ -284,7 +335,8 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     completed_work_orders = db.query(WorkOrder).filter(WorkOrder.status == "completed").count()
     
     total_parts = db.query(Part).count()
-    low_stock_parts = db.query(Part).filter(Part.stock <= Part.min_stock).count()
+    low_stock_parts_list = db.query(Part).filter(Part.stock <= Part.min_stock).order_by(Part.stock.asc()).all()
+    low_stock_parts = len(low_stock_parts_list)
     
     total_revenue = db.query(func.sum(WorkOrder.total_amount)).filter(
         WorkOrder.status == "completed"
@@ -299,7 +351,8 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         completed_work_orders=completed_work_orders,
         total_parts=total_parts,
         low_stock_parts=low_stock_parts,
-        total_revenue=float(total_revenue)
+        total_revenue=float(total_revenue),
+        low_stock_parts_list=low_stock_parts_list
     )
 
 
@@ -313,6 +366,7 @@ def get_invoice(work_order_id: int, db: Session = Depends(get_db)):
         {
             "name": p.part.name,
             "code": p.part.code,
+            "specification": p.part.specification,
             "quantity": p.quantity,
             "unit": p.part.unit,
             "unit_price": p.unit_price,

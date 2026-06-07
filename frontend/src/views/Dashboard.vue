@@ -98,14 +98,18 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card class="stat-card stat-red" v-if="stats?.low_stock_parts > 0">
+        <el-card 
+          class="stat-card stat-red clickable" 
+          v-if="stats?.low_stock_parts > 0"
+          @click="showLowStockDialog = true"
+        >
           <div class="stat-content">
             <div class="stat-icon">
               <el-icon :size="40"><Warning /></el-icon>
             </div>
             <div class="stat-info">
               <div class="stat-value">{{ stats?.low_stock_parts || 0 }}</div>
-              <div class="stat-label">库存预警</div>
+              <div class="stat-label">库存预警 <span class="view-detail">点击查看</span></div>
             </div>
           </div>
         </el-card>
@@ -175,6 +179,50 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <el-dialog v-model="showLowStockDialog" title="库存预警详情" width="700px" top="5vh">
+      <el-alert
+        title="以下配件库存已低于安全线，请及时补货！"
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 16px"
+      />
+      <el-table :data="stats?.low_stock_parts_list || []" border empty-text="暂无预警配件">
+        <el-table-column prop="code" label="配件编码" width="120" />
+        <el-table-column prop="name" label="配件名称" />
+        <el-table-column prop="specification" label="规格型号" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="category" label="分类" width="120" />
+        <el-table-column label="当前库存" width="120">
+          <template #default="{ row }">
+            <el-tag type="danger" size="large">
+              {{ row.stock }} {{ row.unit }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="安全库存" width="100">
+          <template #default="{ row }">
+            {{ row.min_stock }} {{ row.unit }}
+          </template>
+        </el-table-column>
+        <el-table-column label="差额" width="100">
+          <template #default="{ row }">
+            <span class="shortage">-{{ row.min_stock - row.stock }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="单价" width="100">
+          <template #default="{ row }">
+            ¥{{ row.price.toFixed(2) }}
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="showLowStockDialog = false">关闭</el-button>
+        <el-button type="primary" @click="$router.push('/parts')">
+          前往配件管理
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -187,6 +235,7 @@ const stats = ref(null)
 const recentAppointments = ref([])
 const recentWorkOrders = ref([])
 const loading = ref(false)
+const showLowStockDialog = ref(false)
 
 const loadData = async () => {
   loading.value = true
@@ -274,6 +323,28 @@ onMounted(() => {
   border: none;
   border-radius: 8px;
   overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card.clickable {
+  cursor: pointer;
+}
+
+.stat-card.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+}
+
+.view-detail {
+  font-size: 12px;
+  color: #409eff;
+  margin-left: 8px;
+  text-decoration: underline;
+}
+
+.shortage {
+  color: #f56c6c;
+  font-weight: bold;
 }
 
 .stat-card :deep(.el-card__body) {

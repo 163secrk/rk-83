@@ -36,6 +36,7 @@ class Part(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     code = Column(String(50), nullable=False, unique=True)
+    specification = Column(String(200))
     category = Column(String(50), nullable=False)
     price = Column(Float, nullable=False)
     stock = Column(Integer, default=0)
