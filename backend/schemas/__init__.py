@@ -90,6 +90,33 @@ class Technician(TechnicianBase):
         from_attributes = True
 
 
+class TechnicianMonthStats(BaseModel):
+    completed_orders: int = 0
+    total_hours: float = 0.0
+    total_income: float = 0.0
+
+    class Config:
+        from_attributes = True
+
+
+class TechnicianDetail(TechnicianBase):
+    id: int
+    created_at: datetime
+    month_stats: TechnicianMonthStats
+
+    class Config:
+        from_attributes = True
+
+
+class TechnicianWithStats(TechnicianBase):
+    id: int
+    created_at: datetime
+    month_stats: TechnicianMonthStats
+
+    class Config:
+        from_attributes = True
+
+
 class PartBase(BaseModel):
     name: str
     code: str

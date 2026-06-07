@@ -25,6 +25,7 @@ export const appointmentAPI = {
 export const technicianAPI = {
   getList: (params) => request.get('/technicians', { params }),
   getById: (id) => request.get(`/technicians/${id}`),
+  getDetail: (id) => request.get(`/technicians/${id}/detail`),
   create: (data) => request.post('/technicians', data),
   update: (id, data) => request.put(`/technicians/${id}`, data),
   updateStatus: (id, status) => request.put(`/technicians/${id}/status?status=${status}`),
