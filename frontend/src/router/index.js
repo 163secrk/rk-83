@@ -60,6 +60,11 @@ const routes = [
     path: '/vehicles/:id/maintenance',
     name: 'VehicleMaintenance',
     component: () => import('../views/VehicleMaintenance.vue')
+  },
+  {
+    path: '/packages',
+    name: 'MaintenancePackages',
+    component: () => import('../views/MaintenancePackages.vue')
   }
 ]
 

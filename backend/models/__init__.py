@@ -71,6 +71,7 @@ class Appointment(Base):
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer, ForeignKey("customers.id"), nullable=False)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=True)
+    package_id = Column(Integer, ForeignKey("maintenance_packages.id"), nullable=True)
     service_type = Column(String(50), nullable=False)
     description = Column(Text)
     appointment_date = Column(DateTime, nullable=False)
@@ -79,6 +80,7 @@ class Appointment(Base):
 
     customer = relationship("Customer", back_populates="appointments")
     vehicle = relationship("Vehicle", back_populates="appointments")
+    package = relationship("MaintenancePackage", back_populates="appointments")
     work_order = relationship("WorkOrder", back_populates="appointment", uselist=False)
 
 
@@ -88,6 +90,8 @@ class WorkOrder(Base):
     id = Column(Integer, primary_key=True, index=True)
     appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=False)
     technician_id = Column(Integer, ForeignKey("technicians.id"), nullable=False)
+    package_id = Column(Integer, ForeignKey("maintenance_packages.id"), nullable=True)
+    package_price = Column(Float, nullable=True)
     status = Column(String(20), default="assigned")
     actual_start = Column(DateTime)
     actual_end = Column(DateTime)
@@ -98,6 +102,7 @@ class WorkOrder(Base):
 
     appointment = relationship("Appointment", back_populates="work_order")
     technician = relationship("Technician", back_populates="work_orders")
+    package = relationship("MaintenancePackage", back_populates="work_orders")
     parts = relationship("WorkOrderPart", back_populates="work_order")
 
 
@@ -114,3 +119,43 @@ class WorkOrderPart(Base):
 
     work_order = relationship("WorkOrder", back_populates="parts")
     part = relationship("Part", back_populates="work_order_parts")
+
+
+class MaintenancePackage(Base):
+    __tablename__ = "maintenance_packages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False, unique=True)
+    description = Column(Text)
+    package_price = Column(Float, nullable=False)
+    is_active = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.now)
+
+    services = relationship("MaintenancePackageService", back_populates="package", cascade="all, delete-orphan")
+    parts = relationship("MaintenancePackagePart", back_populates="package", cascade="all, delete-orphan")
+    appointments = relationship("Appointment", back_populates="package")
+    work_orders = relationship("WorkOrder", back_populates="package")
+
+
+class MaintenancePackageService(Base):
+    __tablename__ = "maintenance_package_services"
+
+    id = Column(Integer, primary_key=True, index=True)
+    package_id = Column(Integer, ForeignKey("maintenance_packages.id"), nullable=False)
+    service_type = Column(String(50), nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+
+    package = relationship("MaintenancePackage", back_populates="services")
+
+
+class MaintenancePackagePart(Base):
+    __tablename__ = "maintenance_package_parts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    package_id = Column(Integer, ForeignKey("maintenance_packages.id"), nullable=False)
+    part_id = Column(Integer, ForeignKey("parts.id"), nullable=False)
+    quantity = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, default=datetime.now)
+
+    package = relationship("MaintenancePackage", back_populates="parts")
+    part = relationship("Part")

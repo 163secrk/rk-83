@@ -153,9 +153,82 @@ class Part(PartBase):
         from_attributes = True
 
 
+class MaintenancePackageServiceBase(BaseModel):
+    service_type: str
+
+
+class MaintenancePackageServiceCreate(MaintenancePackageServiceBase):
+    pass
+
+
+class MaintenancePackageService(MaintenancePackageServiceBase):
+    id: int
+    package_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MaintenancePackagePartBase(BaseModel):
+    part_id: int
+    quantity: int = 1
+
+
+class MaintenancePackagePartCreate(MaintenancePackagePartBase):
+    pass
+
+
+class MaintenancePackagePartUpdate(BaseModel):
+    part_id: Optional[int] = None
+    quantity: Optional[int] = None
+
+
+class MaintenancePackagePart(MaintenancePackagePartBase):
+    id: int
+    package_id: int
+    created_at: datetime
+    part: Part
+
+    class Config:
+        from_attributes = True
+
+
+class MaintenancePackageBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    package_price: float
+    is_active: Optional[int] = 1
+
+
+class MaintenancePackageCreate(MaintenancePackageBase):
+    services: List[MaintenancePackageServiceCreate] = []
+    parts: List[MaintenancePackagePartCreate] = []
+
+
+class MaintenancePackageUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    package_price: Optional[float] = None
+    is_active: Optional[int] = None
+    services: Optional[List[MaintenancePackageServiceCreate]] = None
+    parts: Optional[List[MaintenancePackagePartCreate]] = None
+
+
+class MaintenancePackage(MaintenancePackageBase):
+    id: int
+    created_at: datetime
+    services: List[MaintenancePackageService] = []
+    parts: List[MaintenancePackagePart] = []
+
+    class Config:
+        from_attributes = True
+
+
 class AppointmentBase(BaseModel):
     customer_id: int
     vehicle_id: Optional[int] = None
+    package_id: Optional[int] = None
     service_type: str
     description: Optional[str] = None
     appointment_date: datetime
@@ -180,6 +253,7 @@ class Appointment(AppointmentBase):
     created_at: datetime
     customer: Customer
     vehicle: Optional[Vehicle] = None
+    package: Optional[MaintenancePackage] = None
 
     class Config:
         from_attributes = True
@@ -284,10 +358,13 @@ class WorkOrderUpdate(BaseModel):
     labor_cost: Optional[float] = None
     notes: Optional[str] = None
     parts: Optional[List[WorkOrderPartCreate]] = None
+    package_price: Optional[float] = None
 
 
 class WorkOrder(WorkOrderBase):
     id: int
+    package_id: Optional[int] = None
+    package_price: Optional[float] = None
     status: str
     actual_start: Optional[datetime] = None
     actual_end: Optional[datetime] = None
@@ -297,6 +374,7 @@ class WorkOrder(WorkOrderBase):
     created_at: datetime
     appointment: Appointment
     technician: Technician
+    package: Optional[MaintenancePackage] = None
     parts: List[WorkOrderPart] = []
 
     class Config:

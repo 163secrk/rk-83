@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, date, timezone, timedelta
 from database import get_db
-from models import Appointment, Customer, WorkOrder
+from models import Appointment, Customer, WorkOrder, MaintenancePackage
 from schemas import Appointment as AppointmentSchema, AppointmentCreate, AppointmentUpdate, CustomerCreate
 
 router = APIRouter()
@@ -131,11 +131,25 @@ def create_appointment(appointment: AppointmentCreate, db: Session = Depends(get
             db.refresh(db_vehicle)
             vehicle_id = db_vehicle.id
     
+    package_id = appointment.package_id
+    service_type = appointment.service_type
+    
+    if package_id:
+        package = db.query(MaintenancePackage).filter(
+            MaintenancePackage.id == package_id,
+            MaintenancePackage.is_active == 1
+        ).first()
+        if not package:
+            raise HTTPException(status_code=404, detail="套餐不存在或已停用")
+        if package.services:
+            service_type = package.services[0].service_type
+    
     local_appointment_date = _to_local_datetime(appointment.appointment_date)
     db_appointment = Appointment(
         customer_id=customer.id,
         vehicle_id=vehicle_id,
-        service_type=appointment.service_type,
+        package_id=package_id,
+        service_type=service_type,
         description=appointment.description,
         appointment_date=local_appointment_date,
         status="pending"

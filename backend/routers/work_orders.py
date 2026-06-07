@@ -4,7 +4,7 @@ from sqlalchemy import func, update
 from typing import List
 from datetime import datetime, date
 from database import get_db
-from models import WorkOrder, WorkOrderPart, Appointment, Technician, Part
+from models import WorkOrder, WorkOrderPart, Appointment, Technician, Part, MaintenancePackage, MaintenancePackagePart
 from schemas import (
     WorkOrder as WorkOrderSchema,
     WorkOrderCreate,
@@ -122,8 +122,46 @@ def create_work_order(work_order: WorkOrderCreate, db: Session = Depends(get_db)
     if technician.status != "available":
         raise HTTPException(status_code=400, detail="该技师当前不可接单")
     
-    db_work_order = WorkOrder(**work_order.model_dump())
+    package_id = None
+    package_price = None
+    total_amount = 0
+    
+    if appointment.package_id:
+        package = db.query(MaintenancePackage).filter(
+            MaintenancePackage.id == appointment.package_id,
+            MaintenancePackage.is_active == 1
+        ).first()
+        if package:
+            package_id = package.id
+            package_price = package.package_price
+            total_amount = package_price
+    
+    db_work_order = WorkOrder(
+        **work_order.model_dump(),
+        package_id=package_id,
+        package_price=package_price,
+        total_amount=total_amount
+    )
     db.add(db_work_order)
+    db.flush()
+    
+    if package_id:
+        package_parts = db.query(MaintenancePackagePart).filter(
+            MaintenancePackagePart.package_id == package_id
+        ).all()
+        
+        for pkg_part in package_parts:
+            part = db.query(Part).filter(Part.id == pkg_part.part_id).first()
+            if part:
+                _deduct_stock_atomic(db, pkg_part.part_id, pkg_part.quantity)
+                work_order_part = WorkOrderPart(
+                    work_order_id=db_work_order.id,
+                    part_id=pkg_part.part_id,
+                    quantity=pkg_part.quantity,
+                    unit_price=part.price,
+                    subtotal=part.price * pkg_part.quantity
+                )
+                db.add(work_order_part)
     
     appointment.status = "confirmed"
     technician.status = "busy"
@@ -178,11 +216,17 @@ def update_work_order(
                 )
                 db.add(work_order_part)
     
+    if work_order_update.package_price is not None:
+        db_work_order.package_price = work_order_update.package_price
+    
     db.commit()
     db.refresh(db_work_order)
     
-    parts_total = sum(p.subtotal for p in db_work_order.parts)
-    db_work_order.total_amount = db_work_order.labor_cost + parts_total
+    if db_work_order.package_id and db_work_order.package_price is not None:
+        db_work_order.total_amount = db_work_order.package_price
+    else:
+        parts_total = sum(p.subtotal for p in db_work_order.parts)
+        db_work_order.total_amount = db_work_order.labor_cost + parts_total
     db.commit()
     
     return db_work_order
@@ -254,8 +298,11 @@ def add_work_order_part(
     db.commit()
     db.refresh(db_work_order)
     
-    parts_total = sum(p.subtotal for p in db_work_order.parts)
-    db_work_order.total_amount = db_work_order.labor_cost + parts_total
+    if db_work_order.package_id and db_work_order.package_price is not None:
+        db_work_order.total_amount = db_work_order.package_price
+    else:
+        parts_total = sum(p.subtotal for p in db_work_order.parts)
+        db_work_order.total_amount = db_work_order.labor_cost + parts_total
     db.commit()
     
     return db_work_order
@@ -301,8 +348,11 @@ def update_work_order_part(
     db.commit()
     db.refresh(db_work_order)
     
-    parts_total = sum(p.subtotal for p in db_work_order.parts)
-    db_work_order.total_amount = db_work_order.labor_cost + parts_total
+    if db_work_order.package_id and db_work_order.package_price is not None:
+        db_work_order.total_amount = db_work_order.package_price
+    else:
+        parts_total = sum(p.subtotal for p in db_work_order.parts)
+        db_work_order.total_amount = db_work_order.labor_cost + parts_total
     db.commit()
     
     return db_work_order
@@ -335,8 +385,11 @@ def remove_work_order_part(
     db.commit()
     db.refresh(db_work_order)
     
-    parts_total = sum(p.subtotal for p in db_work_order.parts)
-    db_work_order.total_amount = db_work_order.labor_cost + parts_total
+    if db_work_order.package_id and db_work_order.package_price is not None:
+        db_work_order.total_amount = db_work_order.package_price
+    else:
+        parts_total = sum(p.subtotal for p in db_work_order.parts)
+        db_work_order.total_amount = db_work_order.labor_cost + parts_total
     db.commit()
     
     return {"message": "配件已从工单中移除"}
@@ -432,6 +485,12 @@ def get_invoice(work_order_id: int, db: Session = Depends(get_db)):
         car_model = db_work_order.appointment.vehicle.car_model
         car_plate = db_work_order.appointment.vehicle.car_plate
     
+    package_name = None
+    package_price = None
+    if db_work_order.package:
+        package_name = db_work_order.package.name
+        package_price = db_work_order.package_price
+    
     return {
         "work_order_id": db_work_order.id,
         "customer_name": db_work_order.appointment.customer.name,
@@ -440,6 +499,8 @@ def get_invoice(work_order_id: int, db: Session = Depends(get_db)):
         "car_plate": car_plate,
         "service_type": db_work_order.appointment.service_type,
         "technician_name": db_work_order.technician.name,
+        "package_name": package_name,
+        "package_price": package_price,
         "labor_cost": db_work_order.labor_cost,
         "parts": parts_list,
         "parts_total": parts_total,

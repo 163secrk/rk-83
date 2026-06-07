@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
-from routers import appointments, technicians, parts, work_orders, vehicles, customers
+from routers import appointments, technicians, parts, work_orders, vehicles, customers, packages
 
 Base.metadata.create_all(bind=engine)
 
@@ -21,6 +21,7 @@ app.include_router(parts.router, prefix="/api/parts", tags=["配件管理"])
 app.include_router(work_orders.router, prefix="/api/work-orders", tags=["工单管理"])
 app.include_router(vehicles.router, prefix="/api/vehicles", tags=["车辆管理"])
 app.include_router(customers.router, prefix="/api/customers", tags=["客户管理"])
+app.include_router(packages.router, prefix="/api/packages", tags=["套餐管理"])
 
 
 @app.get("/api/health")

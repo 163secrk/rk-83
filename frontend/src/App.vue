@@ -50,6 +50,10 @@
             <el-icon><Goods /></el-icon>
             <span>配件库存</span>
           </el-menu-item>
+          <el-menu-item index="/packages">
+            <el-icon><Present /></el-icon>
+            <span>保养套餐</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
       <el-main class="main">

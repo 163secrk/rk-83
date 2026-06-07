@@ -60,6 +60,10 @@
               <span class="label">服务类型：</span>
               <span class="value">{{ workOrder.appointment.service_type }}</span>
             </div>
+            <div class="info-item" v-if="workOrder.package">
+              <span class="label">套餐：</span>
+              <span class="value package-name">{{ workOrder.package.name }}</span>
+            </div>
             <div class="info-item">
               <span class="label">技师：</span>
               <span class="value">{{ workOrder.technician.name }}</span>
@@ -105,6 +109,16 @@
               </el-form-item>
               <el-form-item label="配件费用">
                 <el-input :value="'¥' + partsTotal.toFixed(2)" disabled />
+              </el-form-item>
+              <el-form-item label="套餐价" v-if="workOrder.package">
+                <el-input-number
+                  v-model="costForm.package_price"
+                  :min="0"
+                  :precision="2"
+                  style="width: 100%"
+                  :disabled="workOrder.status === 'completed'"
+                />
+                <div class="field-tip">套餐工单按套餐价结算，不单独计算工时和配件</div>
               </el-form-item>
               <el-form-item label="总费用">
                 <el-input :value="'¥' + totalAmount.toFixed(2)" disabled class="total-amount" />
@@ -284,6 +298,8 @@
           <div class="invoice-grid">
             <div>服务类型：{{ invoice.service_type }}</div>
             <div>技师：{{ invoice.technician_name }}</div>
+            <div v-if="invoice.package_name">套餐：{{ invoice.package_name }}</div>
+            <div v-if="invoice.package_price !== null">套餐价：¥{{ invoice.package_price.toFixed(2) }}</div>
             <div>工单状态：{{ getStatusText(invoice.status) }}</div>
             <div>开单时间：{{ formatDate(invoice.created_at) }}</div>
             <div v-if="invoice.actual_start">开始时间：{{ formatDate(invoice.actual_start) }}</div>
@@ -313,8 +329,14 @@
             </el-table-column>
           </el-table>
           <div class="invoice-total">
+            <div v-if="invoice.package_price !== null" class="package-price-row">
+              <span class="package-label">套餐价结算</span>
+            </div>
             <div>工时费：<strong>¥{{ invoice.labor_cost.toFixed(2) }}</strong></div>
             <div>配件合计：<strong>¥{{ invoice.parts_total.toFixed(2) }}</strong></div>
+            <div v-if="invoice.package_price !== null" class="package-price-display">
+              套餐优惠：<strong class="discount">-¥{{ (invoice.labor_cost + invoice.parts_total - invoice.package_price).toFixed(2) }}</strong>
+            </div>
             <div class="grand-total">总计：<strong>¥{{ invoice.total_amount.toFixed(2) }}</strong></div>
           </div>
         </div>
@@ -348,7 +370,8 @@ const showInvoiceDialog = ref(false)
 
 const costForm = reactive({
   labor_cost: 0,
-  notes: ''
+  notes: '',
+  package_price: null
 })
 
 const addPartForm = reactive({
@@ -374,6 +397,9 @@ const partsTotal = computed(() => {
 })
 
 const totalAmount = computed(() => {
+  if (workOrder.value?.package_id && costForm.package_price !== null && costForm.package_price !== undefined) {
+    return costForm.package_price
+  }
   return costForm.labor_cost + partsTotal.value
 })
 
@@ -383,6 +409,7 @@ const loadWorkOrder = async () => {
     workOrder.value = await workOrderAPI.getById(workOrderId.value)
     costForm.labor_cost = workOrder.value.labor_cost
     costForm.notes = workOrder.value.notes || ''
+    costForm.package_price = workOrder.value.package_price !== null ? workOrder.value.package_price : null
   } catch (error) {
     ElMessage.error('加载工单详情失败')
     router.push('/work-orders')
@@ -739,5 +766,32 @@ onMounted(() => {
   border-top: 2px solid #ebeef5;
   padding-top: 10px;
   margin-top: 10px;
+}
+
+.package-name {
+  color: #409eff;
+  font-weight: 500;
+}
+
+.field-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+}
+
+.package-price-row {
+  background: linear-gradient(90deg, #ecf5ff 0%, #d9ecff 100%);
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.package-label {
+  color: #409eff;
+  font-weight: 600;
+}
+
+.package-price-display .discount {
+  color: #67c23a;
 }
 </style>

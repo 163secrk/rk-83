@@ -1,5 +1,5 @@
 from database import SessionLocal, engine, Base
-from models import Technician, Part, Customer, Vehicle, Appointment, WorkOrder, WorkOrderPart
+from models import Technician, Part, Customer, Vehicle, Appointment, WorkOrder, WorkOrderPart, MaintenancePackage, MaintenancePackageService, MaintenancePackagePart
 from datetime import datetime, timedelta
 
 Base.metadata.create_all(bind=engine)
@@ -35,7 +35,90 @@ def init_data():
                 Part(name="蓄电池", code="BAT001", specification="12V 60Ah 550CCA", category="电气", price=480.0, stock=10, min_stock=3, unit="个", description="12V 60Ah蓄电池")
             ]
             db.add_all(parts)
+            db.flush()
             print("已初始化配件数据")
+        
+        if db.query(MaintenancePackage).count() == 0:
+            parts_dict = {p.code: p for p in parts}
+            
+            packages_data = [
+                {
+                    "name": "常规保养套餐A",
+                    "description": "适合5000-10000公里常规保养，更换机油机滤，车辆安全检查",
+                    "package_price": 899.0,
+                    "services": ["常规保养"],
+                    "parts": [
+                        {"code": "OIL001", "qty": 4},
+                        {"code": "FIL001", "qty": 1}
+                    ]
+                },
+                {
+                    "name": "标准保养套餐B",
+                    "description": "适合15000-20000公里保养，更换机油三滤，空调系统检查",
+                    "package_price": 1299.0,
+                    "services": ["常规保养"],
+                    "parts": [
+                        {"code": "OIL001", "qty": 4},
+                        {"code": "FIL001", "qty": 1},
+                        {"code": "FIL002", "qty": 1},
+                        {"code": "FIL003", "qty": 1}
+                    ]
+                },
+                {
+                    "name": "全面大保养套餐C",
+                    "description": "适合30000-40000公里大保养，全车油水更换，深度检测",
+                    "package_price": 2999.0,
+                    "services": ["大保养"],
+                    "parts": [
+                        {"code": "OIL001", "qty": 5},
+                        {"code": "FIL001", "qty": 1},
+                        {"code": "FIL002", "qty": 1},
+                        {"code": "FIL003", "qty": 1},
+                        {"code": "BRA002", "qty": 2},
+                        {"code": "TRA001", "qty": 6},
+                        {"code": "SPA001", "qty": 4}
+                    ]
+                },
+                {
+                    "name": "刹车系统保养套餐",
+                    "description": "刹车片更换+刹车油更换，保障行车安全",
+                    "package_price": 1599.0,
+                    "services": ["维修服务"],
+                    "parts": [
+                        {"code": "BRA001", "qty": 1},
+                        {"code": "BRA002", "qty": 2}
+                    ]
+                }
+            ]
+            
+            for pkg_data in packages_data:
+                package = MaintenancePackage(
+                    name=pkg_data["name"],
+                    description=pkg_data["description"],
+                    package_price=pkg_data["package_price"],
+                    is_active=1
+                )
+                db.add(package)
+                db.flush()
+                
+                for service_type in pkg_data["services"]:
+                    pkg_service = MaintenancePackageService(
+                        package_id=package.id,
+                        service_type=service_type
+                    )
+                    db.add(pkg_service)
+                
+                for part_item in pkg_data["parts"]:
+                    part = parts_dict.get(part_item["code"])
+                    if part:
+                        pkg_part = MaintenancePackagePart(
+                            package_id=package.id,
+                            part_id=part.id,
+                            quantity=part_item["qty"]
+                        )
+                        db.add(pkg_part)
+            
+            print("已初始化保养套餐数据")
         
         if db.query(Customer).count() == 0:
             customers = [

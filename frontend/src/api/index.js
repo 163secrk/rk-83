@@ -77,3 +77,12 @@ export const customerAPI = {
   create: (data) => request.post('/customers', data),
   getServiceTypes: (id) => request.get(`/customers/${id}/service-types`)
 }
+
+export const packageAPI = {
+  getList: (params) => request.get('/packages', { params }),
+  getById: (id) => request.get(`/packages/${id}`),
+  create: (data) => request.post('/packages', data),
+  update: (id, data) => request.put(`/packages/${id}`, data),
+  delete: (id) => request.delete(`/packages/${id}`),
+  toggleActive: (id) => request.patch(`/packages/${id}/toggle-active`)
+}
