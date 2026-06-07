@@ -17,32 +17,6 @@ def _to_local_datetime(dt: datetime) -> datetime:
     return dt
 
 
-# #region debug-point helper
-import json, urllib.request, threading
-DEBUG_SERVER_URL = "http://127.0.0.1:7777/event"
-DEBUG_SESSION_ID = "maintenance-system-bugs"
-def _send_debug_log(hypothesis_id, location, msg, data):
-    def _send():
-        try:
-            payload = {
-                "sessionId": DEBUG_SESSION_ID,
-                "runId": "pre-fix",
-                "hypothesisId": hypothesis_id,
-                "location": location,
-                "msg": "[DEBUG] " + msg,
-                "data": data
-            }
-            req = urllib.request.Request(
-                DEBUG_SERVER_URL,
-                data=json.dumps(payload).encode(),
-                headers={"Content-Type": "application/json"}
-            )
-            urllib.request.urlopen(req, timeout=2).read()
-        except:
-            pass
-    threading.Thread(target=_send).start()
-# #endregion
-
 @router.get("/", response_model=List[AppointmentSchema])
 def get_appointments(
     status: str = None,
@@ -50,16 +24,6 @@ def get_appointments(
     end_date: date = None,
     db: Session = Depends(get_db)
 ):
-    # #region debug-point H3,H4:date-filter-received
-    _send_debug_log("H3,H4", "appointments.py:12", "后端收到的日期筛选参数", {
-        "start_date": str(start_date),
-        "start_date_type": str(type(start_date)),
-        "end_date": str(end_date),
-        "end_date_type": str(type(end_date)),
-        "server_today": str(date.today()),
-        "server_now": str(datetime.now())
-    })
-    # #endregion
     query = db.query(Appointment).order_by(Appointment.appointment_date.desc())
     
     if status:
@@ -72,18 +36,6 @@ def get_appointments(
         query = query.filter(Appointment.appointment_date <= end_datetime)
     
     result = query.all()
-    # #region debug-point H3,H4:date-filter-query-result
-    _send_debug_log("H3,H4", "appointments.py:28", "日期筛选查询结果", {
-        "result_count": len(result),
-        "results": [
-            {
-                "id": a.id,
-                "appointment_date": str(a.appointment_date),
-                "appointment_date_iso": a.appointment_date.isoformat() if hasattr(a.appointment_date, 'isoformat') else None
-            } for a in result
-        ]
-    })
-    # #endregion
     return result
 
 
@@ -97,14 +49,16 @@ def get_appointment(appointment_id: int, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=AppointmentSchema)
 def create_appointment(appointment: AppointmentCreate, db: Session = Depends(get_db)):
-    # #region debug-point H1:appointment-time-received
-    _send_debug_log("H1", "appointments.py:40", "后端收到的预约时间", {
-        "received_appointment_date": str(appointment.appointment_date),
-        "received_type": str(type(appointment.appointment_date)),
-        "received_iso": appointment.appointment_date.isoformat() if hasattr(appointment.appointment_date, 'isoformat') else None
-    })
-    # #endregion
     from models import Vehicle
+    
+    if not appointment.service_type and not appointment.package_id:
+        raise HTTPException(status_code=400, detail="请选择服务类型或保养套餐")
+    
+    if not appointment.customer and not appointment.customer_id:
+        raise HTTPException(status_code=400, detail="请填写客户信息或选择客户")
+    
+    if appointment.vehicle and not (appointment.vehicle.car_model and appointment.vehicle.car_plate):
+        raise HTTPException(status_code=400, detail="请填写完整的车辆信息")
     
     customer = db.query(Customer).filter(Customer.phone == appointment.customer.phone).first() if appointment.customer else None
     
@@ -157,13 +111,6 @@ def create_appointment(appointment: AppointmentCreate, db: Session = Depends(get
     db.add(db_appointment)
     db.commit()
     db.refresh(db_appointment)
-    # #region debug-point H1:appointment-time-saved
-    _send_debug_log("H1", "appointments.py:62", "数据库保存的预约时间", {
-        "saved_appointment_date": str(db_appointment.appointment_date),
-        "saved_type": str(type(db_appointment.appointment_date)),
-        "saved_iso": db_appointment.appointment_date.isoformat() if hasattr(db_appointment.appointment_date, 'isoformat') else None
-    })
-    # #endregion
     return db_appointment
 
 

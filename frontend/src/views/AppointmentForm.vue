@@ -32,13 +32,13 @@
 
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="车型" prop="customer.car_model">
-              <el-input v-model="form.customer.car_model" placeholder="例如：宝马5系、奔驰E级" />
+            <el-form-item label="车型" prop="vehicle.car_model">
+              <el-input v-model="form.vehicle.car_model" placeholder="例如：宝马5系、奔驰E级" :disabled="!!form.package_id" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="车牌号" prop="customer.car_plate">
-              <el-input v-model="form.customer.car_plate" placeholder="例如：京A12345" />
+            <el-form-item label="车牌号" prop="vehicle.car_plate">
+              <el-input v-model="form.vehicle.car_plate" placeholder="例如：京A12345" :disabled="!!form.package_id" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -50,9 +50,10 @@
             <el-form-item label="保养套餐">
               <el-select
                 v-model="form.package_id"
-                placeholder="选择保养套餐（可选）"
+                placeholder="选择保养套餐（与服务类型二选一）"
                 clearable
                 style="width: 100%"
+                :disabled="!!form.service_type"
               >
                 <el-option
                   v-for="pkg in availablePackages"
@@ -131,7 +132,7 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="服务类型" prop="service_type">
-              <el-select v-model="form.service_type" placeholder="请选择服务类型" style="width: 100%">
+              <el-select v-model="form.service_type" placeholder="请选择服务类型（与套餐二选一）" style="width: 100%" :disabled="!!form.package_id">
                 <el-option label="常规保养" value="常规保养" />
                 <el-option label="大保养" value="大保养" />
                 <el-option label="维修服务" value="维修服务" />
@@ -218,14 +219,16 @@ const successAppointment = ref(null)
 const availablePackages = ref([])
 
 const form = reactive({
-  customer_id: 0,
+  customer_id: null,
   package_id: null,
   service_type: '',
   description: '',
   appointment_date: null,
   customer: {
     name: '',
-    phone: '',
+    phone: ''
+  },
+  vehicle: {
     car_model: '',
     car_plate: ''
   }
@@ -246,11 +249,16 @@ watch(() => form.package_id, (newVal) => {
     const pkg = availablePackages.value.find(p => p.id === newVal)
     if (pkg) {
       selectedPackage.value = pkg
-      if (pkg.services && pkg.services.length > 0) {
-        form.service_type = pkg.services[0].service_type
-      }
+      form.service_type = ''
     }
   } else {
+    selectedPackage.value = null
+  }
+})
+
+watch(() => form.service_type, (newVal) => {
+  if (newVal) {
+    form.package_id = null
     selectedPackage.value = null
   }
 })
@@ -267,14 +275,14 @@ const rules = {
     { required: true, message: '请输入联系电话', trigger: 'blur' },
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
   ],
-  'customer.car_model': [
+  'vehicle.car_model': [
     { required: true, message: '请输入车型', trigger: 'blur' }
   ],
-  'customer.car_plate': [
+  'vehicle.car_plate': [
     { required: true, message: '请输入车牌号', trigger: 'blur' }
   ],
   service_type: [
-    { required: true, message: '请选择服务类型', trigger: 'change' }
+    { required: true, message: '请选择服务类型或选择套餐', trigger: 'change' }
   ],
   appointment_date: [
     { required: true, message: '请选择预约时间', trigger: 'change' }
@@ -319,13 +327,14 @@ const submitForm = async () => {
     if (valid) {
       submitting.value = true
       try {
-        // #region debug-point H1:appointment-time-before-submit
-        fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"maintenance-system-bugs",runId:"pre-fix",hypothesisId:"H1",location:"AppointmentForm.vue:212",msg:"[DEBUG] 预约提交前时间值",data:{appointment_date_form:form.appointment_date,appointment_date_iso:form.appointment_date?.toISOString(),appointment_date_local:form.appointment_date?.toString(),timezone_offset:new Date().getTimezoneOffset()},ts:Date.now()})}).catch(()=>{});
-        // #endregion
-        const result = await appointmentAPI.create(form)
-        // #region debug-point H1:appointment-time-after-response
-        fetch("http://127.0.0.1:7777/event",{method:"POST",body:JSON.stringify({sessionId:"maintenance-system-bugs",runId:"pre-fix",hypothesisId:"H1",location:"AppointmentForm.vue:221",msg:"[DEBUG] 预约返回后时间值",data:{returned_appointment_date:result.appointment_date,returned_date_formatted:formatDate(result.appointment_date)},ts:Date.now()})}).catch(()=>{});
-        // #endregion
+        const submitData = { ...form }
+        if (submitData.package_id && selectedPackage.value?.services?.length > 0) {
+          submitData.service_type = selectedPackage.value.services[0].service_type
+        }
+        if (!submitData.customer_id) {
+          delete submitData.customer_id
+        }
+        const result = await appointmentAPI.create(submitData)
         successAppointment.value = result
         ElMessage.success('预约提交成功！')
       } catch (error) {
@@ -339,9 +348,12 @@ const submitForm = async () => {
 
 const resetForm = () => {
   formRef.value?.resetFields()
+  form.customer_id = null
   form.customer = {
     name: '',
-    phone: '',
+    phone: ''
+  }
+  form.vehicle = {
     car_model: '',
     car_plate: ''
   }

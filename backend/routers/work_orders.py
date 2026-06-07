@@ -43,33 +43,6 @@ def _add_stock_atomic(db: Session, part_id: int, quantity: int) -> Part:
     return db.query(Part).filter(Part.id == part_id).first()
 
 
-# #region debug-point helper
-import json, urllib.request, threading
-DEBUG_SERVER_URL = "http://127.0.0.1:7777/event"
-DEBUG_SESSION_ID = "maintenance-system-bugs"
-def _send_debug_log(hypothesis_id, location, msg, data):
-    def _send():
-        try:
-            payload = {
-                "sessionId": DEBUG_SESSION_ID,
-                "runId": "pre-fix",
-                "hypothesisId": hypothesis_id,
-                "location": location,
-                "msg": "[DEBUG] " + msg,
-                "data": data
-            }
-            req = urllib.request.Request(
-                DEBUG_SERVER_URL,
-                data=json.dumps(payload).encode(),
-                headers={"Content-Type": "application/json"}
-            )
-            urllib.request.urlopen(req, timeout=2).read()
-        except:
-            pass
-    threading.Thread(target=_send).start()
-# #endregion
-
-
 @router.get("/", response_model=List[WorkOrderSchema])
 def get_work_orders(
     status: str = None,

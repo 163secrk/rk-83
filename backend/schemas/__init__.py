@@ -21,7 +21,7 @@ class Customer(CustomerBase):
 
 
 class VehicleBase(BaseModel):
-    customer_id: int
+    customer_id: Optional[int] = None
     car_model: str
     car_plate: str
     vin: Optional[str] = None
@@ -226,10 +226,10 @@ class MaintenancePackage(MaintenancePackageBase):
 
 
 class AppointmentBase(BaseModel):
-    customer_id: int
+    customer_id: Optional[int] = None
     vehicle_id: Optional[int] = None
     package_id: Optional[int] = None
-    service_type: str
+    service_type: Optional[str] = None
     description: Optional[str] = None
     appointment_date: datetime
 
